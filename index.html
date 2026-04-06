@@ -1,0 +1,352 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  ShoppingBag, 
+  Smartphone, 
+  Activity, 
+  Zap, 
+  Lightbulb, 
+  Utensils, 
+  Wind, 
+  Thermometer, 
+  Key, 
+  Car,
+  TrendingUp,
+  Sparkles,
+  Loader2,
+  Search,
+  ExternalLink,
+  Star,
+  ChevronDown,
+  ArrowRight,
+  Info,
+  Heart,
+  MessageCircle,
+  X,
+  Send,
+  Wand2,
+  User
+} from 'lucide-react';
+
+// API Configuration
+const apiKey = ""; 
+const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+
+const products = [
+  { 
+    id: 1, 
+    name: 'COLMI Smart Ring', 
+    price: 21.99, 
+    icon: <Activity size={32} />, 
+    color: 'from-rose-600 via-red-500 to-orange-400', 
+    description: 'Track your peace. Sleep, heart, and recovery metrics tucked into a tiny, elegant band.', 
+    image: 'https://images.unsplash.com/photo-1598550874175-4d0fe427c731?auto=format&fit=crop&q=80&w=1000',
+    modelImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
+    tagline: 'Feel the Glow'
+  },
+  { 
+    id: 2, 
+    name: 'Ionic Hairbrush', 
+    price: 28.49, 
+    icon: <Wind size={32} />, 
+    color: 'from-red-600 via-rose-500 to-blue-500', 
+    description: 'Say goodbye to frizz. Ionic tech that makes every morning feel like a fresh start.', 
+    image: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?auto=format&fit=crop&q=80&w=1000',
+    modelImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800',
+    tagline: 'Pure Confidence'
+  },
+  { 
+    id: 3, 
+    name: 'MagSafe Car Mount', 
+    price: 34.00, 
+    icon: <Car size={32} />, 
+    color: 'from-rose-700 via-red-600 to-purple-600', 
+    description: 'Magnetic precision. Keep your navigation clear and your phone charged for the next adventure.', 
+    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&q=80&w=1000',
+    modelImage: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800',
+    tagline: 'Always Ready'
+  },
+  { 
+    id: 4, 
+    name: 'Tapo Smart Plug', 
+    price: 24.50, 
+    icon: <Zap size={32} />, 
+    color: 'from-red-500 via-rose-600 to-teal-500', 
+    description: 'Smart energy for a smarter home. Automate your happiness and save the planet.', 
+    image: 'https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&q=80&w=1000',
+    modelImage: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&q=80&w=800',
+    tagline: 'Live Conscious'
+  },
+];
+
+export default function App() {
+  const [activeProduct, setActiveProduct] = useState(products[0]);
+  const [aiInsight, setAiInsight] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [moodInput, setMoodInput] = useState("");
+  const [chatResponse, setChatResponse] = useState("Hey! How are you feeling today? I can help find the perfect vibe for you.");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [happinessStory, setHappinessStory] = useState("");
+  const scrollContainerRef = useRef(null);
+
+  const fetchWithRetry = async (url, options, retries = 5, backoff = 1000) => {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) throw new Error('API Error');
+      return await response.json();
+    } catch (err) {
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+      throw err;
+    }
+  };
+
+  const callGemini = async (prompt, systemInstruction) => {
+    try {
+      const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] }
+        })
+      });
+      return data.candidates?.[0]?.content?.parts?.[0]?.text;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const updateProductData = async (product) => {
+    setLoading(true);
+    const insight = await callGemini(
+      `Why does the ${product.name} bring genuine happiness to someone's daily routine in 2026?`,
+      "You are the soul of Glint.io. Keep insights warm, exciting, and under 25 words."
+    );
+    if (insight) setAiInsight(insight);
+
+    const story = await callGemini(
+      `Create a 1-sentence micro-testimonial from a girl named Maya who just used the ${product.name}. Make it feel like a text to a best friend.`,
+      "You are a trendy teen writing a quick, happy text message."
+    );
+    if (story) setHappinessStory(story);
+    setLoading(false);
+  };
+
+  const handleMoodChat = async (e) => {
+    e.preventDefault();
+    if (!moodInput.trim()) return;
+    setChatLoading(true);
+    const response = await callGemini(
+      `The user says: "${moodInput}". Based on this mood, recommend one of these products: ${products.map(p => p.name).join(', ')}. Explain why in one short, enthusiastic sentence.`,
+      "You are the Glint Mood Concierge. Use emojis. Be very concise."
+    );
+    if (response) {
+      setChatResponse(response);
+      setMoodInput("");
+    }
+    setChatLoading(false);
+  };
+
+  useEffect(() => {
+    updateProductData(activeProduct);
+  }, [activeProduct.id]);
+
+  const handleScroll = (e) => {
+    const scrollPos = e.target.scrollTop;
+    const windowHeight = e.target.clientHeight;
+    const index = Math.round(scrollPos / windowHeight);
+    if (products[index] && products[index].id !== activeProduct.id) {
+      setActiveProduct(products[index]);
+    }
+  };
+
+  return (
+    <div className="h-screen w-full bg-[#050505] text-white overflow-hidden font-sans selection:bg-red-600">
+      {/* Glint Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-[100] p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+        <div className="flex items-center gap-3 group cursor-pointer">
+          <div className="w-10 h-10 bg-gradient-to-tr from-red-600 to-rose-400 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/30">
+            <Sparkles size={20} className="text-white animate-pulse" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-black tracking-tighter text-2xl leading-none">glint<span className="text-red-500">.io</span></span>
+            <span className="text-[8px] font-bold tracking-[0.4em] uppercase text-white/40 ml-0.5">Real Happiness</span>
+          </div>
+        </div>
+
+        <button 
+          onClick={() => setChatOpen(true)}
+          className="bg-red-600 text-white px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-xl flex items-center gap-2"
+        >
+          ✨ Find My Vibe
+        </button>
+      </nav>
+
+      {/* Main Snap Scroll Container */}
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="h-screen w-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
+      >
+        {products.map((product) => (
+          <section key={product.id} className="h-screen w-full snap-start relative flex items-center justify-center overflow-hidden">
+            {/* Visual Background Layer */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {/* Massive Model Aura - The "Visibility" Update */}
+              <div className="absolute -right-20 top-1/2 -translate-y-1/2 w-[80vw] h-[80vh] opacity-40">
+                <img 
+                  src={product.modelImage} 
+                  alt="Model Focus" 
+                  className="w-full h-full object-cover rounded-[10rem] grayscale transition-all duration-[2000ms] animate-float"
+                  style={{ maskImage: 'linear-gradient(to left, black, transparent)' }}
+                />
+              </div>
+
+              <div className={`absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-gradient-to-r ${product.color} rounded-full blur-[180px] opacity-20 animate-morph`}></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/40 to-transparent"></div>
+            </div>
+
+            {/* Product Content */}
+            <div className="relative z-10 max-w-7xl w-full px-8 md:px-24 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-7 space-y-8">
+                {/* Floating Face Badge - High Visibility */}
+                <div className="flex items-center gap-4 animate-in slide-in-from-top-4 duration-700">
+                  <div className="relative">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-rose-400 rounded-full animate-spin-slow opacity-75 blur-sm"></div>
+                    <div className="relative w-20 h-20 rounded-full border-2 border-white overflow-hidden shadow-2xl">
+                       <img src={product.modelImage} alt="Brand Ambassador" className="w-full h-full object-cover scale-110" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center border-2 border-black">
+                      <Heart size={10} fill="white" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-red-500">The Face of Glint</p>
+                    <p className="text-sm font-bold text-white/80">Approved by Maya & 12k others</p>
+                  </div>
+                </div>
+
+                <h2 className="text-7xl md:text-[9rem] font-black tracking-tighter leading-[0.85] drop-shadow-2xl">
+                  {product.name.split(' ').map((word, i) => (
+                    <span key={i} className={i === 0 ? "block text-white" : "block text-transparent stroke-white opacity-40"}>{word}</span>
+                  ))}
+                </h2>
+
+                <p className="text-2xl text-white/60 max-w-xl font-light leading-relaxed">
+                  {product.description}
+                </p>
+
+                {/* Gemini Interactive Card */}
+                <div className="flex flex-col md:flex-row gap-6 items-stretch">
+                  <div className="flex-1 p-8 rounded-[2.5rem] bg-white/5 border border-white/10 backdrop-blur-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                      <Sparkles size={40} />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-red-500 mb-4 flex items-center gap-2">
+                      <Wand2 size={12} /> AI Happiness Insight
+                    </h3>
+                    <p className="text-xl font-medium italic leading-snug">
+                      {loading ? "Vibe checking..." : `"${aiInsight}"`}
+                    </p>
+                  </div>
+
+                  <div className="md:w-64 p-8 rounded-[2.5rem] bg-red-600 flex flex-col justify-between hover:scale-105 transition-transform cursor-pointer group shadow-2xl shadow-red-600/20">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Starting At</p>
+                    <p className="text-4xl font-black tracking-tighter">£{product.price}</p>
+                    <button className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                      Claim Now <ArrowRight size={14} className="group-hover:translate-x-2 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Happiness Story Bubble (Gemini) */}
+              <div className="lg:col-span-5 relative hidden lg:block">
+                <div className="absolute top-0 right-0 w-80 p-8 bg-white text-black rounded-[2.5rem] rounded-tr-none shadow-2xl animate-in zoom-in-50 duration-700">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${product.id}`} alt="user" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Recent Joy</span>
+                  </div>
+                  <p className="text-lg font-bold leading-tight">
+                    {loading ? "..." : happinessStory}
+                  </p>
+                  <div className="mt-4 flex gap-1 text-red-600">
+                    {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* ✨ Mood Concierge Overlay */}
+      {chatOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in">
+          <div className="w-full max-w-xl bg-[#0a0a0a] border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(220,38,38,0.2)]">
+            <div className="p-10 text-center">
+              <button onClick={() => setChatOpen(false)} className="absolute top-8 right-8 text-white/20 hover:text-white transition-colors">
+                <X size={32} />
+              </button>
+              <div className="w-20 h-20 bg-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-red-600/40">
+                <Wand2 size={40} />
+              </div>
+              <h2 className="text-4xl font-black tracking-tighter uppercase mb-4">What's your mood?</h2>
+              <p className="text-white/40 mb-10 text-lg">I'll match your energy with the perfect piece of tech.</p>
+
+              <div className="bg-white/5 p-8 rounded-3xl mb-8 min-h-[120px] flex items-center justify-center italic text-2xl text-white/90">
+                {chatLoading ? <Loader2 className="animate-spin text-red-600" size={32} /> : `"${chatResponse}"`}
+              </div>
+
+              <form onSubmit={handleMoodChat} className="flex gap-4">
+                <input 
+                  type="text" 
+                  value={moodInput}
+                  onChange={(e) => setMoodInput(e.target.value)}
+                  placeholder="I'm feeling adventurous..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-5 text-lg focus:outline-none focus:border-red-600 transition-colors"
+                />
+                <button type="submit" className="bg-red-600 px-8 rounded-2xl hover:bg-white hover:text-black transition-all">
+                  <Send size={24} />
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .stroke-white {
+          -webkit-text-stroke: 2px rgba(255,255,255,1);
+        }
+
+        @keyframes morph {
+          0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; transform: scale(1); }
+          50% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; transform: scale(1.1); }
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(2deg); }
+        }
+
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .animate-morph { animation: morph 12s ease-in-out infinite; }
+        .animate-float { animation: float 8s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
+      `}} />
+    </div>
+  );
+}
